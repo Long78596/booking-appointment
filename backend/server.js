@@ -20,7 +20,7 @@ app.use(cors())
 //api endpoints
 
 app.use("/api/admin", adminRoutes)
- app.use("/api/user", userRouter)
+app.use("/api/user", userRouter)
 
 app.get("/", (req, res) => {
     res.send("API/WORKING")
