@@ -1,20 +1,24 @@
 // import React from 'react'
 
 import { useContext, useEffect, useState } from "react";
-import { useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { AppContext } from "../context/AppContext";
  import { assets } from "../assets/assets";
 import RelatedDoctors from "../components/RelatedDoctors";
+import { toast } from "react-toastify";
+ import axios from "axios";
 
 const Appoinments = () => {
 
   const {docId}=useParams();
-  const {doctors,currencySymbol}=useContext(AppContext);
+  const { doctors, currencySymbol, token, backendUrl, getDoctorsData } =
+    useContext(AppContext);
   const daysOfWeek = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
   const [docInfo,setDocInfo]=useState(null);
   const [docSlots,setDocSlots]=useState([]);
   const [slotIndex, setSlotIndex ]=useState(0);
   const [slotTime, setSlotTime] = useState("");
+  const navigate= useNavigate()
 
   const fetchDocInfo=async ()=>{
     const docInfo=doctors.find(doc=>doc._id=== docId)
@@ -24,6 +28,7 @@ const Appoinments = () => {
   
   }
   const getAvailableSlots= async ()=>{
+    if (!docInfo || !docInfo.slots_booked) return;
     setDocSlots([])
     let today= new Date()
     for(let i =  0; i  < 7; i++){
@@ -50,11 +55,25 @@ const Appoinments = () => {
             hour: "2-digit",
             minute: "2-digit",
           });
+          let day = currentdate.getDate()
+          let month= currentdate.getMonth()
+          let year= currentdate.getFullYear()
+
+          const slotDate = day + "_" + month + "_" +year;
+          
+          const slotTime=formattedTime
+          const isSlotAvaiable =docInfo.slots_booked[slotDate] && docInfo.slots_booked[slotDate].includes(slotTime) ? false : true
+
+          if(isSlotAvaiable){
+            timeSlots.push({
+              datetime: new Date(currentdate),
+              time: formattedTime,
+            });
+
+          }
+          
           //add slot to array
-          timeSlots.push({
-            datetime:new Date(currentdate),
-            time:formattedTime
-          })
+          
           // Increment current time by 30 minutes 
           currentdate.setMinutes(currentdate.getMinutes()+30)
 
@@ -63,6 +82,37 @@ const Appoinments = () => {
 
     }
 
+  }
+  const bookAppointment=async()=>{
+   if(!token){
+      toast.warn("Login to book appoitmnet")
+       return navigate("/")
+   }
+   try{
+       const date= docSlots[slotIndex][0].datetime
+
+       let day = date.getDate()
+       let month = date.getMonth()
+       let year= date.getFullYear()
+       const slotDate = day + "_" + month + "_" + year;
+      //  console.log(slotDate)
+      const { data } = await axios.post(
+        backendUrl + "/api/user/book-appointment",
+        { docId, slotDate, slotTime },
+        { headers: { token } }
+      );
+       if(data.success){
+        toast.success(data.message)
+        getDoctorsData();
+        navigate("/my-appointments");
+
+      }else{
+        toast.error(data.message)
+      }
+   }catch(error){
+      console.log(error)
+      toast.error(error.message)
+     }
   }
 
   useEffect(()=>{
@@ -150,18 +200,23 @@ const Appoinments = () => {
                   onClick={() => setSlotTime(item.time)}
                   className={`text-sm font-light flex-shrink-0 px-5 py-2 rounded-full cursor-pointer ${
                     item.time === slotTime
-                  } ? "bg-primary text-white" : "text-gray-400 border border-gray-300 "`}
+                      ? "bg-primary text-white"
+                      : "text-gray-400 border border-gray-300"
+                  }`}
                   key={index}
                 >
                   {item.time.toLowerCase()}
                 </p>
               ))}
           </div>
-          <button className="bg-primary text-white text-sm font-light px-14 py-3 rounded-full my-6 ">
+
+          <button
+            onClick={bookAppointment}
+            className="bg-primary text-white text-sm font-light px-14 py-3 rounded-full my-6 "
+          >
             Book an appointment
           </button>
         </div>
-
 
         {/* listing related book */}
 
